@@ -4,11 +4,13 @@
 #include <LIS3MDL.h>
 #include <LSM6.h>
 #include <Adafruit_NeoPixel.h>
-#include <IRremote.h>
+#include <IRremoteESP8266.h>
+#include <IRrecv.h>
+#include <IRutils.h>
 #include <Servo.h>
 
 #define RGB_LED_PIN D5
-#define IR_RECEIVER_PIN D6
+#define IR_RECEIVER_PIN D4
 #define SERVO_PIN D3
 #define I2C_SCL_PIN D1
 #define I2C_SDA_PIN D2
@@ -45,9 +47,15 @@ LSM6 imu;
 Adafruit_NeoPixel led = Adafruit_NeoPixel(60, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
 IRrecv irrecv(IR_RECEIVER_PIN);
 Servo servo;
+decode_results results;
+
+float pressure_abs = 0;
+float water_depth = 0;
+const float gravity =  9.80665f;
 
 char mag_report[80];
 char imu_report[80];
+uint32_t cur_ir_command = 0;
 
 LIS3MDL::vector<int16_t> running_min = {32767, 32767, 32767}, running_max = {-32768, -32768, -32768};
 
@@ -88,7 +96,10 @@ void setup() {
 }
 
 void loop() {
-  // mag.read();
+  mag.read();
+  imu.read();
+  pressure_abs = baro.readPressureMillibars();
+  water_depth = 
 
   // running_min.x = min(running_min.x, mag.m.x);
   // running_min.y = min(running_min.y, mag.m.y);
@@ -116,66 +127,32 @@ void loop() {
   //   imu.g.x, imu.g.y, imu.g.z);
   // Serial.print(" || IMU: ");
   // Serial.println(imu_report);
-
-  // if (irrecv.decode()){
-  //   Serial.println(irrecv.decodedIRData.command);
-  //   switch (irrecv.decodedIRData.command)
-  //   {
-  //   case BUTTON_VOLDOWN:
-  //     servo.writeMicroseconds(2000);
-  //     break;
-  //   case BUTTON_VOLUP:
-  //     servo.writeMicroseconds(1000);
-  //     break;
-  //   default:
-  //     break;
-  //   }
-  //   irrecv.resume();
-  // }else{
-  //   servo.writeMicroseconds(1500);
-  // }
-  if(Serial.available()){
-    switch(Serial.parseInt()){
-      case 1:
+  if(irrecv.decode(&results)){
+    switch(results.command){
+      case BUTTON_VOLDOWN:
+        cur_ir_command = BUTTON_VOLDOWN;
+        break;
+      case BUTTON_VOLUP:
+        cur_ir_command = BUTTON_VOLUP;
+        break;
+      case 0:
+        break;
+      default:
+        cur_ir_command = 0;
+        break;
+    }
+    switch(cur_ir_command){
+      case BUTTON_VOLDOWN:
         servo.writeMicroseconds(1000);
         break;
-      case 2:
+      case BUTTON_VOLUP:
         servo.writeMicroseconds(2000);
         break;
       default:
         servo.writeMicroseconds(1500);
         break;
     }
+    irrecv.resume();
   }
-
-  // if(irrecv.decode()){
-  //   Serial.println(irrecv.decodedIRData.command);
-  //   irrecv.resume();
-  //   switch(irrecv.decodedIRData.command){
-  //     case BUTTON_2:
-  //       servo.writeMicroseconds(2000);
-  //       break;
-  //     case BUTTON_8:
-  //       servo.write(1000);
-  //       break;
-  //     default:
-  //       break;
-  //   }
-  // }else{
-  //   servo.writeMicroseconds(1500);
-  // }
-  // delay(100);
-
-  // for(int i = 1500; i <= 2000; i++){
-  //   servo.writeMicroseconds(i);
-  //   delay(10);
-  // }
-  // for(int i = 2000; i >= 1000; i--){
-  //   servo.writeMicroseconds(i);
-  //   delay(10);
-  // }
-  // for(int i = 1000; i <= 1500; i++){
-  //   servo.writeMicroseconds(i);
-  //   delay(10);
-  // }
+  delay(100);
 }
